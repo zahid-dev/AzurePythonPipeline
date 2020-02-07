@@ -8,17 +8,6 @@ trigger:
 
 pool:
   vmImage: 'ubuntu-latest'
-strategy:
-  matrix:
-    Python27:
-      python.version: '2.7'
-    Python35:
-      python.version: '3.5'
-    Python36:
-      python.version: '3.6'
-    Python37:
-      python.version: '3.7'
-
 steps:
 - task: UsePythonVersion@0
   inputs:
@@ -26,11 +15,30 @@ steps:
   displayName: 'Use Python $(python.version)'
 
 - script: |
+    python -m venv antenv
+    source antenv/bin/activate
     python -m pip install --upgrade pip
+    pip install setup
     pip install -r requirements.txt
-  displayName: 'Install dependencies'
+  workingDirectory: $(projectRoot)
+  displayName: "Install requirements"
 
-- script: |
-    pip install pytest pytest-azurepipelines
-    pytest
-  displayName: 'pytest'
+- task: ArchiveFiles@2
+  inputs:
+    rootFolderOrFile: '$(Build.BinariesDirectory)'
+    includeRootFolder: false
+    archiveType: 'zip'
+    archiveFile: '$(Build.ArtifactStagingDirectory)/$(Build.BuildId).zip'
+    replaceExistingArchive: true
+- publish: $(Build.ArtifactStagingDirectory)/$(Build.BuildId).zip
+  displayName: 'Upload package'
+  artifact: drop
+
+- task: AzureWebApp@1
+  inputs:
+    azureSubscription: 'Azure subscription 1(4874949a-8687-4dd6-81c7-204ab7a3fe6d)'
+    appType: 'webAppLinux'
+    appName: 'emumba-zahid'
+    package: '$(System.DefaultWorkingDirectory)/**/*.zip'
+    runtimeStack: 'PYTHON|3.6'
+    startUpCommand: 'gunicorn --bind=0.0.0.0 --workers=4 startup:app'
